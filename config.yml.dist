@@ -1,0 +1,6 @@
+credentials:
+  google:
+    key: ~
+  here:
+    app_code: ~
+    app_id: ~
