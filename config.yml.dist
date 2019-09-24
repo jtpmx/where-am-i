@@ -1,5 +1,5 @@
 services:
-  Google:
+  Google Maps API:
     credentials:
       api_key: ~
   HERE:
