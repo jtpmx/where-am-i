@@ -1,6 +1,8 @@
-credentials:
-  google:
-    key: ~
-  here:
-    app_code: ~
-    app_id: ~
+services:
+  Google:
+    credentials:
+      api_key: ~
+  HERE:
+    credentials:
+      app_code: ~
+      app_id: ~
