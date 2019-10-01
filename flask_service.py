@@ -7,9 +7,20 @@ api = Api(app)
 
 
 class RestfulWhereAmI(Resource):
+    """
+    A RESTFul interface for the Where Am I application
+    
+    """
     CONF_PATH = 'config.yml'
 
     def get(self, address):
+        """
+        Handler for the /geo GET endpoint
+
+        Args:
+            address: search query
+
+        """
         try:
             return WhereAmI(self.CONF_PATH).geo_lookup(address)
         except GeoLookupError as geo_error:
