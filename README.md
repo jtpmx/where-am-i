@@ -69,14 +69,14 @@ Error response example (searching for mitmitmit):
 
 ## Configuration
 
-Configuration is done via a YAML file. `services` contains an entry for each enabled third-party service. This is an ordered list, ranked from most-preferrable to least:
+Configuration is done via a YAML file. `services` contains an entry for each enabled third-party service. Note: It is possible to add multiple copies of a service (Google Maps API for example) with different credentials. `services` is an ordered list, ranked from the most-preferrable service configuration to the least favorable:
 
     services:
       SERVICE NAME:
         credentials:
           API_KEY: SECRET_API_KEY
  
-The default configuration file `config.yml` has two entries, one for each of the two supported services b default: Google Maps API and HERE. The tilde (~) is a placeholder for the API credentials which you are responsible for acquiring. For instructions on getting an HERE key, see the following document: https://developer.here.com/map/API. For Google Maps, see: https://developers.google.com/maps/documentation/javascript/get-api-key.
+The default configuration file `config.yml` has two entries, one for each of the two supported services by default: Google Maps API and HERE. The tilde (~) is a placeholder for the API credentials which you are responsible for acquiring. For instructions on getting an HERE key, see the following document: https://developer.here.com/map/API. For Google Maps, see: https://developers.google.com/maps/documentation/javascript/get-api-key.
 
     services:
       Google Maps API:
@@ -89,7 +89,6 @@ The default configuration file `config.yml` has two entries, one for each of the
       RandomGeoService
         credentials:
           special_key: ~
-
 
 ## Adding a New Service
 
