@@ -5,13 +5,45 @@ Where Am I is a geocode resolution service that provides longitude and latitude 
 To run a geocode query using the command line utility, you can use the following syntax:
 
     $ python where_am_i.py "123 Elm Street, Seattle"
-    $ python where_am_i.py "Empire State Building"
+    $ python where_am_i.py --rest_host http://localhost:5000 "Empire State Building"
 
 Where Am I is a proxy service--the actual geocode lookup is performed by a third-party service, and the results are transformed into a simplified result. The simplified result is a single point (as opposed to a polygon or bounding box) which most closely represents the location of the query.
 
 This service can be configured to query multiple third-party geocoding services. If the first service in the list is unreachable, times-out, or returns no results, the query will be attempted against the next service in the list until the list is exhausted.
 
 A reference design for a REST service has also been included--it is implemented using the Flask framework.
+
+# REST API
+
+Where Am I has a simple GET interface for making requests. Here is an example usage using the included Flask service running locally on port 5000 (default). This query will return results for the location of the *Massachusetts Institute of Technology*:
+
+    http://localhost:5000/geo/MIT
+
+Successful response example:
+
+```
+{
+  "status": "success",
+  "result": {
+    "service": "Google Maps API",
+    "location": {
+      "lng": -71.09416,
+      "lat": 42.360091
+    }
+  }
+}
+```
+
+Error response example (searching for mitmitmit):
+
+```
+{
+  "status": "No result found",
+  "result": {}
+}
+```
+
+
 
 ## Installation Steps
 
