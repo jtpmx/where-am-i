@@ -22,12 +22,12 @@ class RestfulWhereAmI(Resource):
 
         """
         try:
-            return WhereAmI(self.CONF_PATH).geo_lookup(address)
+            return WhereAmI(self.CONF_PATH).geo_lookup(address), 200
         except GeoLookupError as geo_error:
             return {
                 "status": str(geo_error),
                 "result": {}
-            }
+            }, 200
 
 
 api.add_resource(RestfulWhereAmI, '/geo/<string:address>')

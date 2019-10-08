@@ -13,7 +13,7 @@ Example:
     syntax::
 
         $ python where_am_i.py "123 Elm Street, Seattle"
-        $ python where_am_i.py "Empire State Building"
+        $ python where_am_i.py --rest_host http://localhost:5000 MIT
 
 Where Am I is just a proxy service--the actual geocode lookup is performed
 by a third-party service and the results are transformed into a unified result.
@@ -29,8 +29,10 @@ least. If all services are exhausted, an error is returned.
 import sys
 import yaml
 import json
+import argparse
+from urllib.error import URLError, HTTPError
 from urllib.request import urlopen
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 
 
 class GeoLookupError(Exception):
@@ -54,6 +56,12 @@ class GeoLookupService(object):
 
         """
         self._service_name = service_name
+
+    def __repr__(self):
+        """
+        Printable representation of GeoLookupService
+        """
+        return self._service_name
 
     def lookup(self, search_term):
         """
@@ -101,7 +109,7 @@ class GeoLookupGoogle(GeoLookupService):
         Initialize the Google geocoding proxy
 
         Args:
-          service_name: "Google Maps API"
+          service_name: YAML configuration name for the Google API service
           credentials: a dict containing a single value, the Google Maps api_key
 
         """
@@ -124,13 +132,22 @@ class GeoLookupGoogle(GeoLookupService):
             'address': search_term,
             'key': self.api_key}
 
-        response = urlopen("{}?{}".format(self.url, urlencode(get_params)))
+        try:
+            response = urlopen("{}?{}".format(self.url, urlencode(get_params)))
+        except (URLError, HTTPError):
+            raise GeoLookupError("Connection error")
+
         result = json.loads(response.read())
 
-        if len(result["results"]) == 0:
-            raise GeoLookupError("No result found")
+        try:
+            if result['status'] == 'REQUEST_DENIED':
+                raise GeoLookupError("Invalid {} credentials".format(self))
+            if len(result["results"]) == 0:
+                raise GeoLookupError("No result found")
+            location = result["results"][0]["geometry"]["location"]
+        except KeyError:
+            raise GeoLookupError("Unexpected response from {}".format(self))
 
-        location = result["results"][0]["geometry"]["location"]
         return self._build_successful_response(
             lng=location['lng'],
             lat=location['lat'])
@@ -149,7 +166,7 @@ class GeoLookupHere(GeoLookupService):
         Initialize the HERE geocoding proxy
 
         Args:
-          service_name: "HERE"
+          service_name: YAML configuration name for HERE service
           credentials: a dict containing an app_code, and app_id
 
         """
@@ -175,17 +192,41 @@ class GeoLookupHere(GeoLookupService):
             'app_code': self.app_code,
             'gen': 9}
 
-        response = urlopen("{}?{}".format(self.url, urlencode(get_params)))
+        try:
+            response = urlopen("{}?{}".format(self.url, urlencode(get_params)))
+        except HTTPError as e:
+            if e.code == 400:
+                raise GeoLookupError("Bad query string")
+            elif e.code == 401:
+                raise GeoLookupError("Invalid {} credentials".format(self))   
+            else:
+                raise GeoLookupError("HTTP error")
+        except URLError:
+            raise GeoLookupError("{} connection error".format(self))
+
         result = json.loads(response.read())
 
-        if len(result["Response"]["View"]) == 0:
-            raise GeoLookupError("No result found")
-        else:
+        try:
+            if len(result["Response"]["View"]) == 0:
+                raise GeoLookupError("No result found")
             top_result = result["Response"]["View"][0]["Result"][0]
+        except KeyError:
+            raise GeoLookupError("Unexpected response from {}".format(self))
 
         return self._build_successful_response(
            lng=top_result["Location"]["DisplayPosition"]['Longitude'],
            lat=top_result["Location"]["DisplayPosition"]['Latitude'])
+
+
+"""
+When adding a new GeoLookup service, add a human-friendly name mapping to the
+GEO_NAME_TO_CLASS_MAPPING dictionary. This is how the servivce will be
+referenced from the YAML configuration file.
+"""
+GEO_NAME_TO_CLASS_MAPPING = {
+    "Google Maps API": GeoLookupGoogle,
+    "HERE": GeoLookupHere
+}
 
 
 class WhereAmI(object):
@@ -200,20 +241,15 @@ class WhereAmI(object):
         with open(config_yml) as f:
             config = yaml.load(f, Loader=yaml.FullLoader)
 
-        geo_name_to_obj = {
-            "Google Maps API": GeoLookupGoogle,
-            "HERE": GeoLookupHere
-        }
-
         self._services = []
         for geo_service_name, geo_service_info in config['services'].items():
-            if geo_service_name in geo_name_to_obj.keys():
-                geo_obj = geo_name_to_obj[geo_service_name](
+            if geo_service_name in GEO_NAME_TO_CLASS_MAPPING.keys():
+                geo_obj = GEO_NAME_TO_CLASS_MAPPING[geo_service_name](
                     geo_service_name, geo_service_info['credentials'])
                 self._services.append(geo_obj)
             else:
                 raise RuntimeError(
-                    "Unknown geocoding service: {}".format(geo_service_name))
+                    "{} is an invalid service name".format(geo_service_name))
 
     def geo_lookup(self, search_term):
         """
@@ -229,22 +265,48 @@ class WhereAmI(object):
             On success, returns a long/lat result, including metadata
 
         """
-        if len(self._services) == 0:
+        num_services = len(self._services)
+
+        if num_services == 0:
             raise GeoLookupError("There are no configured geocoding services")
 
-        for geo_service in self._services:
+        for i, geo_service in enumerate(self._services):
             try:
                 return geo_service.lookup(search_term)
             except GeoLookupError:
-                pass
-
-        raise GeoLookupError("No results found")
+                if i < num_services - 1:
+                    pass
+                else:
+                    # This is the last service in our list. Throw an error.
+                    raise
 
 
 # Running the script directly provides a basic CLI search utility
 if __name__ == '__main__':
-    if len(sys.argv) == 2:
-        query = sys.argv[1]
-        print(WhereAmI('config.yml').geo_lookup(query))
+    parser = argparse.ArgumentParser(
+        description='Get the location of a street or landmark')
+    parser.add_argument(
+        'query',
+        type=str,
+        help='Street name or landmark')
+    parser.add_argument(
+        '--config', 
+        default="config.yml",
+        type=str,
+        help='WhereAmI configuration file')
+    parser.add_argument(
+        '--rest_host', 
+        required=False,
+        type=str,
+        help='Use the RESTful service to perform the query instead')
+
+    args = parser.parse_args()
+
+    if args.rest_host:
+        url = "{}/geo/{}".format(args.rest_host, quote(args.query))
+        json_response = json.loads(urlopen(url).read())
+        geo_result = json.dumps(json_response)
     else:
-        print('Usage: python {} "address"'.format(sys.argv[0]))
+        geo_result = WhereAmI(args.config).geo_lookup(args.query)
+    
+    print(geo_result)
