@@ -33,10 +33,11 @@ A reference design for a REST service has also been included--it is implemented 
 
 ## Configuration
 
-Where Am I is configured using a YAML file. `services` contains an entry for each enabled third-party service. `services` is an ordered list, ranked from the most-preferrable service configuration to the least-preferrable. It is possible to add multiple copies of a service (Google Maps API for example) with different credentials. 
+Where Am I is configured using a YAML file. It contains a single ordered list, `services`, which contains an entry for each enabled third-party service. It is ranked from the most-preferrable service configuration to the least-preferrable. It is possible to add multiple copies of a service (Google Maps API for example) with different credentials. 
 
     services:
       SERVICE NAME:
+        timeout: 1.0
         credentials:
           API_KEY: SECRET_API_KEY
  
@@ -59,7 +60,7 @@ The default configuration file `config.yml` has two entries, one for each of the
 
 # REST API
 
-Where Am I includes a Flask service which features a simple GET interface for making requests. Here is an example usage using the included Flask service running locally on port 5000 (default). 
+Where Am I includes a Flask service which features a simple GET interface. Here is an example usage of the Flask service running locally on port 5000 (default). 
 
 Get the location of the *Massachusetts Institute of Technology* campus:
 
